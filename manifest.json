@@ -1,0 +1,14 @@
+{
+  "name": "AnkiFlow — Streak Tracker",
+  "short_name": "AnkiFlow",
+  "description": "Rastreie seus estudos no Anki com streaks, estatísticas e metas.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#080810",
+  "theme_color": "#080810",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

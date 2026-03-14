@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="AnkiFlow"/>
+<meta name="theme-color" content="#080810"/>
+<link rel="manifest" href="manifest.json"/>
+<title>AnkiFlow</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<style>
+/* ══════════════════════════════════════
+   TOKENS
+══════════════════════════════════════ */
+:root {
+  --bg:       #080810;
+  --s1:       #0f0f1c;
+  --s2:       #161628;
+  --s3:       #1e1e35;
+  --border:   rgba(255,255,255,.07);
+  --text:     #f0f0ff;
+  --muted:    #5a5a8a;
+  --dim:      #9090b8;
+  --fire:     #ff4d00;
+  --ember:    #ff8c42;
+  --gold:     #ffc107;
+  --mint:     #00e5a0;
+  --sky:      #38b6ff;
+  --rose:     #ff4d7e;
+  --violet:   #9b5de5;
+  --safe-t:   env(safe-area-inset-top,    0px);
+  --safe-b:   env(safe-area-inset-bottom, 0px);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:16px;scroll-behavior:smooth;}
+body{
+  font-family:'DM Sans','Syne',sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100dvh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior:none;
+}
+button{font-family:inherit;cursor:pointer;border:none;outline:none;}
+input,textarea,select{font-family:inherit;outline:none;}
+
+/* ══════════════════════════════════════
+   BACKGROUND
+══════════════════════════════════════ */
+.bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:.09;}
+.o1{width:500px;height:500px;background:var(--fire);top:-150px;left:-150px;animation:drift 20s ease-in-out infinite alternate;}
+.o2{width:400px;height:400px;background:var(--violet);bottom:-100px;right:-100px;animation:drift 25s ease-in-out infinite alternate-reverse;}
+.o3{width:300px;height:300px;background:var(--mint);top:40%;left:20%;animation:drift 18s ease-in-out infinite alternate;}
+@keyframes drift{to{transform:translate(40px,30px) scale(1.1);}}
+
+/* grid lines */
+.bg-canvas::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:48px 48px;
+}
+
+/* ══════════════════════════════════════
+   SHELL
+══════════════════════════════════════ */
+#app{position:relative;z-index:1;max-width:430px;margin:0 auto;}
+
+/* ══════════════════════════════════════
+   SCREENS
+══════════════════════════════════════ */
+.screen{display:none;padding:0 16px;padding-bottom:calc(90px + var(--safe-b));}
+.screen.active{display:block;}
+
+/* ══════════════════════════════════════
+   HEADER
+══════════════════════════════════════ */
+.topbar{
+  padding:calc(var(--safe-t) + 18px) 16px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;
+  background:linear-gradient(var(--bg) 80%,transparent);
+}
+.brand{display:flex;align-items:center;gap:8px;}
+.brand-icon{font-size:24px;animation:flicker 3s ease-in-out infinite;}
+@keyframes flicker{0%,100%{opacity:1;}45%{opacity:.8;}50%{opacity:1;}55%{opacity:.85;}60%{opacity:1;}}
+.brand-name{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:-.5px;}
+.brand-name em{color:var(--fire);font-style:normal;}
+.topbar-right{display:flex;align-items:center;gap:8px;}
+.icon-btn{
+  width:38px;height:38px;border-radius:12px;
+  background:var(--s2);border:1px solid var(--border);
+  color:var(--dim);font-size:17px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s;
+}
+.icon-btn:active{transform:scale(.92);background:var(--s3);}
+
+/* ══════════════════════════════════════
+   DATE CHIP
+══════════════════════════════════════ */
+.date-chip{
+  margin:0 16px 16px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.date-text{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.studied-today-badge{
+  font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;
+  background:rgba(0,229,160,.12);color:var(--mint);
+  display:none;
+}
+.studied-today-badge.show{display:block;}
+
+/* ══════════════════════════════════════
+   STREAK HERO
+══════════════════════════════════════ */
+.streak-hero{
+  margin:0 16px 16px;
+  background:linear-gradient(135deg,#140800 0%,#0c0c1e 50%,#08140c 100%);
+  border:1px solid rgba(255,77,0,.25);
+  border-radius:24px;padding:24px;
+  position:relative;overflow:hidden;
+}
+.streak-hero::before{
+  content:'';position:absolute;top:-60px;right:-60px;
+  width:220px;height:220px;
+  background:radial-gradient(circle,rgba(255,77,0,.2) 0%,transparent 70%);
+  pointer-events:none;
+}
+.streak-hero::after{
+  content:'';position:absolute;bottom:-40px;left:-40px;
+  width:160px;height:160px;
+  background:radial-gradient(circle,rgba(0,229,160,.1) 0%,transparent 70%);
+  pointer-events:none;
+}
+.streak-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;}
+.streak-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
+.streak-number{
+  font-family:'Syne',sans-serif;font-size:72px;font-weight:800;
+  line-height:1;
+  background:linear-gradient(135deg,var(--fire),var(--ember),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.streak-unit{font-size:14px;color:var(--ember);font-weight:600;margin-top:4px;}
+.streak-right{text-align:right;}
+.streak-record{font-size:11px;color:var(--muted);margin-bottom:2px;}
+.streak-record strong{color:var(--gold);font-size:20px;font-family:'Syne',sans-serif;font-weight:700;}
+.streak-msg{
+  font-size:13px;color:var(--dim);font-style:italic;
+  padding:12px;background:rgba(255,255,255,.04);
+  border-radius:12px;border-left:3px solid var(--fire);
+  position:relative;z-index:1;
+}
+
+/* milestone bar */
+.milestone-bar{margin-top:16px;position:relative;z-index:1;}
+.milestone-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px;}
+.milestone-meta span{color:var(--gold);}
+.bar-track{height:6px;background:var(--s3);border-radius:100px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--fire),var(--gold));transition:width .8s cubic-bezier(.23,1,.32,1);}
+
+/* ══════════════════════════════════════
+   LOG SESSION CARD
+══════════════════════════════════════ */
+.log-card{
+  margin:0 16px 16px;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:20px;padding:20px;
+}
+.log-card h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.log-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.log-field label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-weight:600;}
+.log-field input,.log-field select,.log-field textarea{
+  width:100%;background:var(--s2);border:1px solid var(--border);
+  border-radius:10px;padding:10px 12px;
+  color:var(--text);font-size:14px;
+  transition:border-color .2s;
+}
+.log-field input:focus,.log-field select:focus,.log-field textarea:focus{border-color:var(--fire);}
+.log-field select option{background:var(--s2);}
+.log-field.full{grid-column:1/-1;}
+.log-field textarea{resize:none;height:60px;font-size:13px;}
+.difficulty-row{display:flex;gap:6px;margin-bottom:14px;}
+.diff-btn{
+  flex:1;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:600;
+  background:var(--s2);border:1.5px solid var(--border);color:var(--dim);
+  transition:all .2s;
+}
+.diff-btn.active-easy{background:rgba(0,229,160,.15);border-color:var(--mint);color:var(--mint);}
+.diff-btn.active-medium{background:rgba(255,193,7,.12);border-color:var(--gold);color:var(--gold);}
+.diff-btn.active-hard{background:rgba(255,77,126,.12);border-color:var(--rose);color:var(--rose);}
+.diff-btn.active-brutal{background:rgba(155,93,229,.15);border-color:var(--violet);color:var(--violet);}
+.log-submit{
+  width:100%;padding:14px;border-radius:14px;font-size:15px;font-weight:700;
+  background:linear-gradient(135deg,var(--fire),var(--ember));
+  color:white;letter-spacing:.3px;
+  transition:all .2s;box-shadow:0 4px 24px rgba(255,77,0,.3);
+  font-family:'Syne',sans-serif;
+}
+.log-submit:active{transform:scale(.97);box-shadow:0 2px 12px rgba(255,77,0,.2);}
+.log-submit:disabled{opacity:.5;cursor:not-allowed;}
+
+/* ══════════════════════════════════════
+   QUICK STATS ROW
+══════════════════════════════════════ */
+.stats-row{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  gap:10px;margin:0 16px 16px;
+}
+.stat-pill{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:14px 10px;text-align:center;
+}
+.stat-pill-icon{font-size:20px;margin-bottom:4px;}
+.stat-pill-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;line-height:1;}
+.stat-pill-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
+.c-fire{color:var(--fire);}
+.c-mint{color:var(--mint);}
+.c-sky{color:var(--sky);}
+.c-gold{color:var(--gold);}
+.c-rose{color:var(--rose);}
+.c-violet{color:var(--violet);}
+
+/* ══════════════════════════════════════
+   SECTION TITLE
+══════════════════════════════════════ */
+.sec-title{
+  margin:0 16px 10px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.sec-title h2{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;}
+.sec-title a{font-size:12px;color:var(--fire);text-decoration:none;}
+
+/* ══════════════════════════════════════
+   HEATMAP
+══════════════════════════════════════ */
+.heatmap-wrap{
+  margin:0 16px 16px;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:20px;padding:16px;overflow:hidden;
+}
+.heatmap-months{display:flex;gap:2px;margin-bottom:6px;}
+.hm-month{font-size:10px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.heatmap-grid{display:grid;grid-template-columns:repeat(53,1fr);gap:2px;}
+.hm-cell{
+  aspect-ratio:1;border-radius:2px;
+  background:var(--s2);
+  transition:all .15s;
+  cursor:pointer;position:relative;
+}
+.hm-cell[data-count="1"]{background:rgba(255,77,0,.3);}
+.hm-cell[data-count="2"]{background:rgba(255,77,0,.55);}
+.hm-cell[data-count="3"]{background:rgba(255,77,0,.75);}
+.hm-cell[data-count="4"]{background:var(--fire);}
+.hm-cell.today{box-shadow:0 0 0 1.5px var(--gold);}
+.hm-cell:hover{transform:scale(1.4);z-index:5;}
+.hm-legend{display:flex;align-items:center;gap:4px;margin-top:8px;justify-content:flex-end;}
+.hm-legend span{font-size:10px;color:var(--muted);}
+.hm-sq{width:10px;height:10px;border-radius:2px;}
+
+/* ══════════════════════════════════════
+   CHART AREA
+══════════════════════════════════════ */
+.chart-card{
+  margin:0 16px 16px;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:20px;padding:16px;
+}
+.chart-card h3{font-size:13px;font-weight:600;color:var(--dim);margin-bottom:14px;}
+.bar-chart{display:flex;align-items:flex-end;gap:5px;height:80px;}
+.bc-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.bc-bar{
+  width:100%;border-radius:4px 4px 0 0;
+  background:linear-gradient(180deg,var(--fire),rgba(255,77,0,.3));
+  min-height:3px;transition:height .6s cubic-bezier(.23,1,.32,1);
+  position:relative;
+}
+.bc-bar.today-bar{background:linear-gradient(180deg,var(--gold),rgba(255,193,7,.3));}
+.bc-day{font-size:9px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+.bc-val{font-size:9px;color:var(--dim);}
+
+/* accuracy chart */
+.acc-row{display:flex;gap:8px;margin-top:4px;}
+.acc-seg{border-radius:100px;height:8px;transition:width .8s;}
+.acc-labels{display:flex;gap:16px;margin-top:8px;}
+.acc-label{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);}
+.acc-dot{width:8px;height:8px;border-radius:50%;}
+
+/* ══════════════════════════════════════
+   SESSION HISTORY
+══════════════════════════════════════ */
+.history-list{margin:0 16px 16px;display:flex;flex-direction:column;gap:8px;}
+.session-card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:14px 16px;
+  display:flex;align-items:center;gap:12px;
+}
+.session-date{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--muted);min-width:38px;text-align:center;
+}
+.session-date strong{display:block;font-size:18px;color:var(--text);}
+.session-info{flex:1;}
+.session-info h4{font-size:14px;font-weight:600;margin-bottom:2px;}
+.session-meta{display:flex;gap:10px;flex-wrap:wrap;}
+.session-tag{
+  font-size:11px;padding:2px 8px;border-radius:100px;
+  background:var(--s2);color:var(--dim);
+}
+.session-diff{font-size:11px;font-weight:600;padding:4px 10px;border-radius:100px;}
+.diff-easy{background:rgba(0,229,160,.12);color:var(--mint);}
+.diff-medium{background:rgba(255,193,7,.12);color:var(--gold);}
+.diff-hard{background:rgba(255,77,126,.12);color:var(--rose);}
+.diff-brutal{background:rgba(155,93,229,.15);color:var(--violet);}
+
+/* ══════════════════════════════════════
+   STATS SCREEN
+══════════════════════════════════════ */
+.big-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 16px 16px;}
+.big-stat{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:16px;
+}
+.big-stat.span2{grid-column:1/-1;}
+.big-stat-icon{font-size:22px;margin-bottom:8px;}
+.big-stat-val{font-family:'Syne',sans-serif;font-size:28px;font-weight:800;line-height:1;margin-bottom:2px;}
+.big-stat-lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.big-stat-sub{font-size:12px;color:var(--dim);margin-top:6px;}
+
+.insight-card{
+  margin:0 16px 10px;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:14px 16px;
+  display:flex;align-items:center;gap:12px;
+}
+.insight-icon{font-size:24px;flex-shrink:0;}
+.insight-text h4{font-size:13px;font-weight:600;margin-bottom:2px;}
+.insight-text p{font-size:12px;color:var(--dim);line-height:1.5;}
+
+/* progress rings */
+.rings-row{display:flex;gap:12px;margin:0 16px 16px;}
+.ring-card{
+  flex:1;background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:14px;text-align:center;
+}
+.ring-wrap{position:relative;width:64px;height:64px;margin:0 auto 8px;}
+.ring-wrap svg{transform:rotate(-90deg);}
+.ring-wrap .ring-val{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:800;
+}
+.ring-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+
+/* ══════════════════════════════════════
+   GOALS SCREEN
+══════════════════════════════════════ */
+.goals-list{margin:0 16px 16px;display:flex;flex-direction:column;gap:10px;}
+.goal-card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:16px;padding:16px;
+}
+.goal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.goal-title{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.goal-pct{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;}
+.goal-bar-track{height:8px;background:var(--s3);border-radius:100px;overflow:hidden;margin-bottom:6px;}
+.goal-bar-fill{height:100%;border-radius:100px;transition:width .8s cubic-bezier(.23,1,.32,1);}
+.goal-meta{font-size:11px;color:var(--muted);}
+
+/* ══════════════════════════════════════
+   BOTTOM NAV
+══════════════════════════════════════ */
+.bottom-nav{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:430px;
+  padding:12px 24px calc(var(--safe-b) + 12px);
+  background:rgba(8,8,16,.85);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  display:flex;justify-content:space-around;
+  z-index:100;
+}
+.nav-btn{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  background:none;color:var(--muted);
+  padding:6px 12px;border-radius:14px;
+  transition:all .2s;min-width:56px;
+}
+.nav-btn.active{color:var(--fire);}
+.nav-btn:active{transform:scale(.92);}
+.nav-icon{font-size:22px;line-height:1;}
+.nav-label{font-size:10px;font-weight:600;letter-spacing:.3px;}
+
+/* ══════════════════════════════════════
+   MODAL
+══════════════════════════════════════ */
+.modal-overlay{
+  position:fixed;inset:0;z-index:200;
+  background:rgba(8,8,16,.8);backdrop-filter:blur(10px);
+  display:none;align-items:flex-end;justify-content:center;
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:24px 24px 0 0;padding:24px 20px calc(var(--safe-b) + 24px);
+  width:100%;max-width:430px;
+  animation:slideUp .3s cubic-bezier(.23,1,.32,1);
+}
+@keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.modal h3{font-family:'Syne',sans-serif;font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.modal-close{
+  float:right;background:var(--s2);border:1px solid var(--border);
+  color:var(--dim);width:30px;height:30px;border-radius:10px;
+  display:inline-flex;align-items:center;justify-content:center;font-size:16px;
+}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+.toast{
+  position:fixed;bottom:calc(80px + var(--safe-b) + 12px);left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:100px;padding:10px 20px;
+  font-size:13px;font-weight:600;color:var(--text);
+  z-index:300;opacity:0;pointer-events:none;
+  transition:all .3s;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* ══════════════════════════════════════
+   ANIMATIONS
+══════════════════════════════════════ */
+.fade-up{animation:fadeUp .45s cubic-bezier(.23,1,.32,1) both;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+.delay-1{animation-delay:.05s;}
+.delay-2{animation-delay:.1s;}
+.delay-3{animation-delay:.15s;}
+.delay-4{animation-delay:.2s;}
+.delay-5{animation-delay:.25s;}
+.delay-6{animation-delay:.3s;}
+
+/* ══════════════════════════════════════
+   EMPTY STATE
+══════════════════════════════════════ */
+.empty{text-align:center;padding:32px 16px;color:var(--muted);font-size:14px;}
+.empty-icon{font-size:40px;margin-bottom:8px;}
+
+/* ══════════════════════════════════════
+   SETTINGS FIELDS
+══════════════════════════════════════ */
+.settings-group{margin:0 16px 16px;background:var(--s1);border:1px solid var(--border);border-radius:16px;overflow:hidden;}
+.settings-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px;border-bottom:1px solid var(--border);
+}
+.settings-row:last-child{border-bottom:none;}
+.settings-row label{font-size:14px;color:var(--dim);}
+.settings-row input[type=number],.settings-row input[type=time]{
+  background:var(--s2);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);padding:6px 10px;font-size:13px;width:90px;text-align:center;
+}
+.toggle{
+  width:44px;height:26px;background:var(--s3);border-radius:100px;
+  position:relative;cursor:pointer;border:1px solid var(--border);transition:background .2s;
+}
+.toggle.on{background:var(--fire);}
+.toggle::after{
+  content:'';position:absolute;top:3px;left:3px;
+  width:18px;height:18px;border-radius:50%;background:white;
+  transition:transform .2s;
+}
+.toggle.on::after{transform:translateX(18px);}
+.save-settings{
+  margin:0 16px 16px;width:calc(100% - 32px);padding:14px;
+  border-radius:14px;background:var(--fire);color:white;
+  font-size:15px;font-weight:700;font-family:'Syne',sans-serif;
+}
+
+/* streak freeze badge */
+.freeze-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-size:12px;padding:4px 12px;border-radius:100px;
+  background:rgba(56,182,255,.12);color:var(--sky);border:1px solid rgba(56,182,255,.2);
+  margin-left:8px;
+}
+</style>
+</head>
+<body>
+
+<div class="bg-canvas">
+  <div class="orb o1"></div>
+  <div class="orb o2"></div>
+  <div class="orb o3"></div>
+</div>
+
+<div id="app">
+
+  <!-- ══ TOPBAR ══ -->
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-icon">🔥</span>
+      <span class="brand-name">Anki<em>Flow</em></span>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" onclick="openSettings()" title="Config">⚙️</button>
+    </div>
+  </div>
+
+  <!-- ══ HOME SCREEN ══ -->
+  <div id="screen-home" class="screen active">
+
+    <div class="date-chip">
+      <span class="date-text" id="date-label"></span>
+      <span class="studied-today-badge" id="studied-badge">✅ Registrado hoje</span>
+    </div>
+
+    <!-- STREAK HERO -->
+    <div class="streak-hero fade-up">
+      <div class="streak-top">
+        <div>
+          <div class="streak-label">🔥 Streak atual</div>
+          <div class="streak-number" id="hero-streak">0</div>
+          <div class="streak-unit" id="hero-unit">dias consecutivos</div>
+        </div>
+        <div class="streak-right">
+          <div class="streak-record">Recorde 🏆</div>
+          <div><strong id="hero-record" style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--gold);">0</strong></div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;" id="freeze-info"></div>
+        </div>
+      </div>
+      <div class="streak-msg" id="hero-msg">Registre sua primeira sessão hoje!</div>
+      <div class="milestone-bar">
+        <div class="milestone-meta">
+          <span id="ms-label">Próximo marco</span>
+          <span id="ms-val"></span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" id="ms-fill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <!-- QUICK STATS -->
+    <div class="stats-row fade-up delay-1">
+      <div class="stat-pill">
+        <div class="stat-pill-icon">📚</div>
+        <div class="stat-pill-val c-fire" id="qs-cards">0</div>
+        <div class="stat-pill-lbl">Cards hoje</div>
+      </div>
+      <div class="stat-pill">
+        <div class="stat-pill-icon">⏱️</div>
+        <div class="stat-pill-val c-mint" id="qs-time">0m</div>
+        <div class="stat-pill-lbl">Tempo hoje</div>
+      </div>
+      <div class="stat-pill">
+        <div class="stat-pill-icon">📅</div>
+        <div class="stat-pill-val c-sky" id="qs-total">0</div>
+        <div class="stat-pill-lbl">Total dias</div>
+      </div>
+    </div>
+
+    <!-- LOG SESSION -->
+    <div class="log-card fade-up delay-2" id="log-card-section">
+      <h3>📝 Registrar Sessão</h3>
+
+      <div class="log-grid">
+        <div class="log-field">
+          <label>Cards respondidos</label>
+          <input type="number" id="inp-cards" placeholder="Ex: 50" min="0"/>
+        </div>
+        <div class="log-field">
+          <label>Tempo estudado</label>
+          <input type="number" id="inp-time" placeholder="min" min="1"/>
+        </div>
+        <div class="log-field">
+          <label>Deck principal</label>
+          <input type="text" id="inp-deck" placeholder="Ex: Medicina"/>
+        </div>
+        <div class="log-field">
+          <label>Acertos (%)</label>
+          <input type="number" id="inp-acc" placeholder="Ex: 85" min="0" max="100"/>
+        </div>
+      </div>
+
+      <div class="log-field" style="margin-bottom:10px;">
+        <label style="display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;font-weight:600;">Dificuldade da sessão</label>
+        <div class="difficulty-row" id="diff-row">
+          <button class="diff-btn" data-diff="easy" onclick="selectDiff(this)">😄 Fácil</button>
+          <button class="diff-btn" data-diff="medium" onclick="selectDiff(this)">😐 Médio</button>
+          <button class="diff-btn" data-diff="hard" onclick="selectDiff(this)">😤 Difícil</button>
+          <button class="diff-btn" data-diff="brutal" onclick="selectDiff(this)">💀 Brutal</button>
+        </div>
+      </div>
+
+      <div class="log-field full" style="margin-bottom:14px;">
+        <label style="display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;font-weight:600;">Maior dificuldade hoje</label>
+        <textarea id="inp-note" placeholder="Ex: Farmacologia - mecanismos de ação, anatomia do coração..."></textarea>
+      </div>
+
+      <button class="log-submit" onclick="logSession()">⚡ Registrar Sessão</button>
+    </div>
+
+    <!-- WEEKLY BARS -->
+    <div class="sec-title fade-up delay-3"><h2>📊 Últimos 7 dias</h2></div>
+    <div class="chart-card fade-up delay-3">
+      <h3>Cards respondidos por dia</h3>
+      <div class="bar-chart" id="weekly-bars"></div>
+    </div>
+
+    <!-- HEATMAP -->
+    <div class="sec-title fade-up delay-4"><h2>🗓️ Mapa de atividade</h2></div>
+    <div class="heatmap-wrap fade-up delay-4">
+      <div class="heatmap-grid" id="heatmap"></div>
+      <div class="hm-legend">
+        <span>Menos</span>
+        <div class="hm-sq" style="background:var(--s2);border:1px solid var(--border);"></div>
+        <div class="hm-sq" style="background:rgba(255,77,0,.3);"></div>
+        <div class="hm-sq" style="background:rgba(255,77,0,.55);"></div>
+        <div class="hm-sq" style="background:var(--fire);"></div>
+        <span>Mais</span>
+      </div>
+    </div>
+
+    <!-- RECENT SESSIONS -->
+    <div class="sec-title fade-up delay-5"><h2>🕐 Sessões recentes</h2></div>
+    <div class="history-list fade-up delay-5" id="recent-list"></div>
+
+  </div><!-- /home -->
+
+  <!-- ══ STATS SCREEN ══ -->
+  <div id="screen-stats" class="screen">
+
+    <div style="height:8px;"></div>
+
+    <!-- RINGS -->
+    <div class="rings-row fade-up">
+      <div class="ring-card">
+        <div class="ring-wrap">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--s3)" stroke-width="7"/>
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--mint)" stroke-width="7"
+              stroke-dasharray="163" id="ring-acc-circle" stroke-dashoffset="163" stroke-linecap="round"/>
+          </svg>
+          <div class="ring-val c-mint" id="ring-acc-val">—</div>
+        </div>
+        <div class="ring-lbl">Acertos</div>
+      </div>
+      <div class="ring-card">
+        <div class="ring-wrap">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--s3)" stroke-width="7"/>
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--sky)" stroke-width="7"
+              stroke-dasharray="163" id="ring-cons-circle" stroke-dashoffset="163" stroke-linecap="round"/>
+          </svg>
+          <div class="ring-val c-sky" id="ring-cons-val">—</div>
+        </div>
+        <div class="ring-lbl">Consistência</div>
+      </div>
+      <div class="ring-card">
+        <div class="ring-wrap">
+          <svg width="64" height="64" viewBox="0 0 64 64">
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--s3)" stroke-width="7"/>
+            <circle cx="32" cy="32" r="26" fill="none" stroke="var(--gold)" stroke-width="7"
+              stroke-dasharray="163" id="ring-goal-circle" stroke-dashoffset="163" stroke-linecap="round"/>
+          </svg>
+          <div class="ring-val c-gold" id="ring-goal-val">—</div>
+        </div>
+        <div class="ring-lbl">Meta diária</div>
+      </div>
+    </div>
+
+    <!-- BIG STATS -->
+    <div class="big-stat-grid fade-up delay-1">
+      <div class="big-stat">
+        <div class="big-stat-icon">📚</div>
+        <div class="big-stat-val c-fire" id="bs-total-cards">0</div>
+        <div class="big-stat-lbl">Cards totais</div>
+        <div class="big-stat-sub" id="bs-avg-day">— / dia em média</div>
+      </div>
+      <div class="big-stat">
+        <div class="big-stat-icon">⏱️</div>
+        <div class="big-stat-val c-mint" id="bs-total-time">0h</div>
+        <div class="big-stat-lbl">Tempo total</div>
+        <div class="big-stat-sub" id="bs-avg-time">— min/dia em média</div>
+      </div>
+      <div class="big-stat">
+        <div class="big-stat-icon">🔥</div>
+        <div class="big-stat-val c-gold" id="bs-streak">0</div>
+        <div class="big-stat-lbl">Streak atual</div>
+        <div class="big-stat-sub" id="bs-record">Recorde: 0 dias</div>
+      </div>
+      <div class="big-stat">
+        <div class="big-stat-icon">📅</div>
+        <div class="big-stat-val c-sky" id="bs-study-days">0</div>
+        <div class="big-stat-lbl">Dias estudados</div>
+        <div class="big-stat-sub" id="bs-since">desde o início</div>
+      </div>
+      <div class="big-stat span2">
+        <div class="big-stat-icon">🎯</div>
+        <div class="big-stat-val c-violet" id="bs-best-session">0</div>
+        <div class="big-stat-lbl">Melhor sessão (cards)</div>
+        <div class="big-stat-sub" id="bs-best-date">—</div>
+      </div>
+    </div>
+
+    <!-- DIFFICULTY BREAKDOWN -->
+    <div class="sec-title fade-up delay-2"><h2>😤 Dificuldade por sessão</h2></div>
+    <div class="chart-card fade-up delay-2">
+      <div class="acc-row" id="diff-bar-row"></div>
+      <div class="acc-labels" id="diff-labels"></div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="sec-title fade-up delay-3"><h2>💡 Insights</h2></div>
+    <div id="insights-list"></div>
+
+    <!-- DIFFICULTY HISTORY -->
+    <div class="sec-title fade-up delay-4"><h2>📓 Dificuldades anotadas</h2></div>
+    <div class="history-list fade-up delay-4" id="notes-list"></div>
+
+  </div><!-- /stats -->
+
+  <!-- ══ GOALS SCREEN ══ -->
+  <div id="screen-goals" class="screen">
+    <div style="height:8px;"></div>
+    <div class="sec-title fade-up"><h2>🏆 Marcos de streak</h2></div>
+    <div class="goals-list fade-up delay-1" id="milestones-list"></div>
+    <div class="sec-title fade-up delay-2"><h2>🎯 Metas diárias</h2></div>
+    <div class="goals-list fade-up delay-3" id="daily-goals-list"></div>
+  </div>
+
+  <!-- ══ HISTORY SCREEN ══ -->
+  <div id="screen-history" class="screen">
+    <div style="height:8px;"></div>
+    <div class="sec-title fade-up"><h2>📋 Histórico completo</h2></div>
+    <div class="history-list fade-up delay-1" id="full-history-list"></div>
+  </div>
+
+  <!-- ══ BOTTOM NAV ══ -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-screen="home" onclick="navigate('home',this)">
+      <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
+    </button>
+    <button class="nav-btn" data-screen="stats" onclick="navigate('stats',this)">
+      <span class="nav-icon">📊</span><span class="nav-label">Stats</span>
+    </button>
+    <button class="nav-btn" data-screen="goals" onclick="navigate('goals',this)">
+      <span class="nav-icon">🏆</span><span class="nav-label">Metas</span>
+    </button>
+    <button class="nav-btn" data-screen="history" onclick="navigate('history',this)">
+      <span class="nav-icon">📋</span><span class="nav-label">Histórico</span>
+    </button>
+  </nav>
+
+</div><!-- /app -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal" onclick="closeModal(event)">
+  <div class="modal">
+    <h3>⚙️ Configurações <button class="modal-close" onclick="closeSettings()">✕</button></h3>
+    <div class="settings-group">
+      <div class="settings-row">
+        <label>Meta de cards/dia</label>
+        <input type="number" id="set-goal-cards" value="50" min="1"/>
+      </div>
+      <div class="settings-row">
+        <label>Meta de tempo (min)</label>
+        <input type="number" id="set-goal-time" value="30" min="1"/>
+      </div>
+      <div class="settings-row">
+        <label>Streak freeze (dias)</label>
+        <input type="number" id="set-freeze" value="0" min="0" max="7"/>
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-row">
+        <label>Nome do usuário</label>
+        <input type="text" id="set-name" placeholder="Seu nome" style="width:140px;background:var(--s2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 10px;font-size:13px;"/>
+      </div>
+    </div>
+    <button class="save-settings" onclick="saveSettings()">💾 Salvar</button>
+    <button style="width:calc(100% - 32px);margin:0 0 8px;padding:12px;border-radius:14px;background:transparent;border:1px solid var(--rose);color:var(--rose);font-size:13px;font-weight:600;" onclick="resetData()">🗑️ Apagar todos os dados</button>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════
+   STATE
+══════════════════════════════════════ */
+const STORE_KEY = 'ankiflow_v2';
+let state = loadState();
+let selectedDiff = null;
+
+function defaultState(){
+  return {
+    sessions:[],       // [{date,cards,time,acc,diff,deck,note}]
+    streak:0,
+    longestStreak:0,
+    lastStudyDate:null,
+    totalDays:0,
+    settings:{
+      goalCards:50,
+      goalTime:30,
+      freezeDays:0,
+      name:'',
+    }
+  };
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY);
+    if(!raw) return defaultState();
+    const d = JSON.parse(raw);
+    if(!d.settings) d.settings = defaultState().settings;
+    return d;
+  }catch(e){ return defaultState(); }
+}
+
+function saveState(){
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+/* ══════════════════════════════════════
+   DATE UTILS
+══════════════════════════════════════ */
+const toISO = d => d.toISOString().split('T')[0];
+const todayISO = () => toISO(new Date());
+const DAYS_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MONTHS_PT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+function formatDate(iso){
+  const d = new Date(iso+'T12:00:00');
+  return `${d.getDate()} ${MONTHS_PT[d.getMonth()]}`;
+}
+
+/* ══════════════════════════════════════
+   STREAK LOGIC
+══════════════════════════════════════ */
+function computeStreak(){
+  const dates = [...new Set(state.sessions.map(s=>s.date))].sort();
+  if(!dates.length){ state.streak=0; return; }
+
+  const today = todayISO();
+  const yesterday = toISO(new Date(Date.now()-864e5));
+  const freeze = state.settings.freezeDays||0;
+
+  let cur=0, max=0, prev=null;
+  for(const d of dates){
+    if(!prev){ cur=1; }
+    else{
+      const gap = (new Date(d)-new Date(prev))/864e5;
+      if(gap===1) cur++;
+      else if(gap<=1+freeze) cur++; // freeze days used
+      else cur=1;
+    }
+    max = Math.max(max,cur);
+    prev=d;
+  }
+
+  // check if streak is still active (studied today or yesterday)
+  const lastDate = dates[dates.length-1];
+  if(lastDate!==today && lastDate!==yesterday){
+    // Check freeze
+    const gap = (new Date(today)-new Date(lastDate))/864e5;
+    if(gap > 1+freeze) cur=0;
+  }
+
+  state.streak = cur;
+  state.longestStreak = Math.max(state.longestStreak, max);
+  state.totalDays = dates.length;
+  state.lastStudyDate = lastDate||null;
+}
+
+/* ══════════════════════════════════════
+   LOG SESSION
+══════════════════════════════════════ */
+function selectDiff(btn){
+  selectedDiff = btn.dataset.diff;
+  document.querySelectorAll('.diff-btn').forEach(b=>{
+    b.className='diff-btn';
+  });
+  const cls={easy:'active-easy',medium:'active-medium',hard:'active-hard',brutal:'active-brutal'};
+  btn.classList.add(cls[selectedDiff]);
+}
+
+function logSession(){
+  const cards = parseInt(document.getElementById('inp-cards').value)||0;
+  const time  = parseInt(document.getElementById('inp-time').value)||0;
+  const deck  = document.getElementById('inp-deck').value.trim()||'Anki';
+  const acc   = parseInt(document.getElementById('inp-acc').value)||null;
+  const note  = document.getElementById('inp-note').value.trim();
+  const diff  = selectedDiff||'medium';
+
+  if(!cards && !time){
+    showToast('⚠️ Preencha ao menos cards ou tempo');
+    return;
+  }
+
+  const today = todayISO();
+  // Check if already logged today
+  const alreadyToday = state.sessions.some(s=>s.date===today);
+
+  state.sessions.push({
+    date:today,
+    cards, time, acc, deck, note, diff,
+    ts: Date.now()
+  });
+
+  computeStreak();
+  saveState();
+  renderAll();
+
+  // reset form
+  document.getElementById('inp-cards').value='';
+  document.getElementById('inp-time').value='';
+  document.getElementById('inp-acc').value='';
+  document.getElementById('inp-note').value='';
+  document.querySelectorAll('.diff-btn').forEach(b=>b.className='diff-btn');
+  selectedDiff=null;
+
+  showToast(alreadyToday ? '✅ Sessão extra registrada!' : '🔥 Sessão registrada! Streak atualizado!');
+}
+
+/* ══════════════════════════════════════
+   RENDER
+══════════════════════════════════════ */
+function renderAll(){
+  renderHome();
+  renderStats();
+  renderGoals();
+  renderHistory();
+}
+
+/* ─── HOME ─────────────────────────────── */
+function renderHome(){
+  computeStreak();
+  const s = state;
+  const today = todayISO();
+
+  // date label
+  const now = new Date();
+  document.getElementById('date-label').textContent =
+    `${DAYS_PT[now.getDay()]}, ${now.getDate()} de ${MONTHS_PT[now.getMonth()]} ${now.getFullYear()}`;
+
+  // streak hero
+  document.getElementById('hero-streak').textContent = s.streak;
+  document.getElementById('hero-record').textContent = s.longestStreak;
+  document.getElementById('hero-unit').textContent =
+    s.streak===1 ? 'dia consecutivo' : 'dias consecutivos';
+  document.getElementById('hero-msg').textContent = motivationalMsg(s.streak);
+
+  if(s.settings.freezeDays>0){
+    document.getElementById('freeze-info').innerHTML =
+      `<span style="color:var(--sky)">❄️ Freeze: ${s.settings.freezeDays}d</span>`;
+  }
+
+  // milestone bar
+  const milestones=[3,7,14,21,30,60,100,180,365];
+  const next = milestones.find(m=>m>s.streak)||milestones[milestones.length-1];
+  const prev = [...milestones].reverse().find(m=>m<=s.streak)||0;
+  const pct = next===prev ? 100 : Math.round((s.streak-prev)/(next-prev)*100);
+  document.getElementById('ms-fill').style.width = pct+'%';
+  document.getElementById('ms-label').textContent = `Próximo: ${next} dias`;
+  document.getElementById('ms-val').textContent = `${pct}%`;
+
+  // studied today badge
+  const studiedToday = s.sessions.some(ss=>ss.date===today);
+  document.getElementById('studied-badge').classList.toggle('show', studiedToday);
+
+  // today totals
+  const todaySessions = s.sessions.filter(ss=>ss.date===today);
+  const todayCards = todaySessions.reduce((a,b)=>a+(b.cards||0),0);
+  const todayTime  = todaySessions.reduce((a,b)=>a+(b.time||0),0);
+  document.getElementById('qs-cards').textContent = todayCards;
+  document.getElementById('qs-time').textContent  = todayTime>59 ? `${Math.floor(todayTime/60)}h${todayTime%60}m` : `${todayTime}m`;
+  document.getElementById('qs-total').textContent = s.totalDays;
+
+  // weekly bars
+  renderWeeklyBars();
+
+  // heatmap
+  renderHeatmap();
+
+  // recent sessions
+  const recent = [...s.sessions].reverse().slice(0,5);
+  const el = document.getElementById('recent-list');
+  if(!recent.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🌱</div>Nenhuma sessão ainda.<br>Registre sua primeira!</div>';
+  } else {
+    el.innerHTML = recent.map(sessionCard).join('');
+  }
+}
+
+function renderWeeklyBars(){
+  const days=7;
+  const today=new Date();
+  const cols=[];
+  let maxCards=1;
+
+  for(let i=days-1;i>=0;i--){
+    const d=new Date(today);
+    d.setDate(d.getDate()-i);
+    const iso=toISO(d);
+    const daySessions=state.sessions.filter(s=>s.date===iso);
+    const cards=daySessions.reduce((a,b)=>a+(b.cards||0),0);
+    maxCards=Math.max(maxCards,cards);
+    cols.push({iso,day:DAYS_PT[d.getDay()],cards,isToday:i===0});
+  }
+
+  document.getElementById('weekly-bars').innerHTML = cols.map(c=>{
+    const h = Math.round((c.cards/maxCards)*70)||0;
+    return `<div class="bc-col">
+      <div class="bc-val">${c.cards||''}</div>
+      <div class="bc-bar${c.isToday?' today-bar':''}" style="height:${Math.max(h,c.cards?4:3)}px"></div>
+      <div class="bc-day">${c.day}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderHeatmap(){
+  const studyMap={};
+  state.sessions.forEach(s=>{
+    studyMap[s.date]=(studyMap[s.date]||0)+(s.cards||1);
+  });
+
+  const today=new Date();
+  const todayISO_=toISO(today);
+  // go back 52 weeks (364 days) + pad to Sunday
+  const startDay=new Date(today);
+  startDay.setDate(startDay.getDate()-363);
+  // align to Sunday
+  startDay.setDate(startDay.getDate()-startDay.getDay());
+
+  const cells=[];
+  const cur=new Date(startDay);
+  while(cur<=today){
+    const iso=toISO(cur);
+    const count=studyMap[iso]||0;
+    let level=0;
+    if(count>0) level=count<20?1:count<50?2:count<100?3:4;
+    cells.push({iso,level,isToday:iso===todayISO_});
+    cur.setDate(cur.getDate()+1);
+  }
+
+  document.getElementById('heatmap').innerHTML = cells.map(c=>
+    `<div class="hm-cell${c.isToday?' today':''}" data-count="${c.level}" title="${c.iso}: ${c.level?'estudado':'—'}"></div>`
+  ).join('');
+}
+
+function sessionCard(s){
+  const d=new Date(s.date+'T12:00:00');
+  const diffClass={easy:'diff-easy',medium:'diff-medium',hard:'diff-hard',brutal:'diff-brutal'}[s.diff]||'diff-medium';
+  const diffLabel={easy:'😄 Fácil',medium:'😐 Médio',hard:'😤 Difícil',brutal:'💀 Brutal'}[s.diff]||'Médio';
+  return `<div class="session-card">
+    <div class="session-date">${MONTHS_PT[d.getMonth()]}<strong>${d.getDate()}</strong></div>
+    <div class="session-info">
+      <h4>${s.deck||'Anki'}</h4>
+      <div class="session-meta">
+        ${s.cards?`<span class="session-tag">📚 ${s.cards} cards</span>`:''}
+        ${s.time?`<span class="session-tag">⏱️ ${s.time}min</span>`:''}
+        ${s.acc!=null?`<span class="session-tag">🎯 ${s.acc}%</span>`:''}
+      </div>
+      ${s.note?`<div style="font-size:11px;color:var(--muted);margin-top:4px;font-style:italic;">"${s.note}"</div>`:''}
+    </div>
+    <span class="session-diff ${diffClass}">${diffLabel}</span>
+  </div>`;
+}
+
+/* ─── STATS ─────────────────────────────── */
+function renderStats(){
+  const s=state;
+  const sessions=s.sessions;
+  if(!sessions.length){
+    document.getElementById('bs-total-cards').textContent='0';
+    return;
+  }
+
+  const totalCards=sessions.reduce((a,b)=>a+(b.cards||0),0);
+  const totalTime =sessions.reduce((a,b)=>a+(b.time||0),0);
+  const dates=[...new Set(sessions.map(s=>s.date))];
+  const avgCards=dates.length?Math.round(totalCards/dates.length):0;
+  const avgTime =dates.length?Math.round(totalTime/dates.length):0;
+
+  // accuracy average
+  const withAcc=sessions.filter(s=>s.acc!=null);
+  const avgAcc=withAcc.length?Math.round(withAcc.reduce((a,b)=>a+b.acc,0)/withAcc.length):null;
+
+  // best session
+  const best=sessions.reduce((a,b)=>(b.cards||0)>(a.cards||0)?b:a, sessions[0]);
+
+  // consistency (% of days in last 30 studied)
+  let studied30=0;
+  for(let i=0;i<30;i++){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    if(dates.includes(toISO(d))) studied30++;
+  }
+  const cons=Math.round(studied30/30*100);
+
+  // goal pct
+  const todaySess=sessions.filter(s=>s.date===todayISO());
+  const todayCards=todaySess.reduce((a,b)=>a+(b.cards||0),0);
+  const goalPct=Math.min(100,Math.round(todayCards/(s.settings.goalCards||50)*100));
+
+  // update rings
+  setRing('ring-acc',avgAcc!=null?avgAcc:0,'ring-acc-val',avgAcc!=null?avgAcc+'%':'—','var(--mint)');
+  setRing('ring-cons',cons,'ring-cons-val',cons+'%','var(--sky)');
+  setRing('ring-goal',goalPct,'ring-goal-val',goalPct+'%','var(--gold)');
+
+  // big stats
+  document.getElementById('bs-total-cards').textContent=totalCards.toLocaleString();
+  document.getElementById('bs-avg-day').textContent=`${avgCards} cards/dia em média`;
+  document.getElementById('bs-total-time').textContent=totalTime>=60?`${Math.floor(totalTime/60)}h${totalTime%60}m`:`${totalTime}m`;
+  document.getElementById('bs-avg-time').textContent=`${avgTime} min/dia em média`;
+  document.getElementById('bs-streak').textContent=s.streak;
+  document.getElementById('bs-record').textContent=`Recorde: ${s.longestStreak} dias`;
+  document.getElementById('bs-study-days').textContent=dates.length;
+  document.getElementById('bs-since').textContent=dates.length?`desde ${formatDate(dates[0])}`:'';
+  document.getElementById('bs-best-session').textContent=(best.cards||0).toLocaleString();
+  document.getElementById('bs-best-date').textContent=best.date?`em ${formatDate(best.date)}`:'';
+
+  // difficulty breakdown
+  const diffCounts={easy:0,medium:0,hard:0,brutal:0};
+  sessions.forEach(s=>{ if(s.diff) diffCounts[s.diff]++; });
+  const total=sessions.length||1;
+  const diffColors={easy:'var(--mint)',medium:'var(--gold)',hard:'var(--rose)',brutal:'var(--violet)'};
+  const diffNames={easy:'😄 Fácil',medium:'😐 Médio',hard:'😤 Difícil',brutal:'💀 Brutal'};
+  document.getElementById('diff-bar-row').innerHTML = Object.entries(diffCounts).map(([k,v])=>{
+    const pct=Math.round(v/total*100);
+    return `<div class="acc-seg" style="flex:${pct||1};background:${diffColors[k]};opacity:${pct?1:.2}"></div>`;
+  }).join('');
+  document.getElementById('diff-labels').innerHTML = Object.entries(diffCounts).map(([k,v])=>{
+    const pct=Math.round(v/total*100);
+    return `<div class="acc-label"><div class="acc-dot" style="background:${diffColors[k]}"></div>${diffNames[k]}: ${pct}%</div>`;
+  }).join('');
+
+  // insights
+  const insights=[];
+  if(s.streak>=7) insights.push({icon:'🔥',title:'Sequência forte!',text:`Você está em chamas com ${s.streak} dias seguidos. Não deixe apagar!`});
+  if(avgAcc>=90) insights.push({icon:'🎯',title:'Precisão excelente!',text:`Taxa de acertos de ${avgAcc}% — você está dominando o material.`});
+  if(avgAcc!=null && avgAcc<70) insights.push({icon:'⚠️',title:'Acertos baixos',text:`Média de ${avgAcc}%. Considere revisar os conceitos fundamentais.`});
+  if(cons>=80) insights.push({icon:'📅',title:'Muito consistente!',text:`${cons}% de consistência nos últimos 30 dias. Impressionante!`});
+  if(diffCounts.hard+diffCounts.brutal > sessions.length*0.5) insights.push({icon:'💀',title:'Material desafiador',text:'Mais da metade das sessões foram difíceis. Considere dividir em sessões menores.'});
+  if(avgTime>0 && avgTime<15) insights.push({icon:'⏱️',title:'Sessões curtas',text:`Média de ${avgTime} min. Sessões de 20-30 min tendem a ser mais eficazes.`});
+  if(!insights.length) insights.push({icon:'💡',title:'Continue registrando!',text:'Quanto mais sessões você registrar, mais insights aparecem aqui.'});
+
+  document.getElementById('insights-list').innerHTML = insights.map(i=>
+    `<div class="insight-card fade-up delay-3">
+      <div class="insight-icon">${i.icon}</div>
+      <div class="insight-text"><h4>${i.title}</h4><p>${i.text}</p></div>
+    </div>`
+  ).join('');
+
+  // notes list
+  const withNotes=[...sessions].reverse().filter(s=>s.note);
+  document.getElementById('notes-list').innerHTML = withNotes.length
+    ? withNotes.slice(0,8).map(s=>`
+        <div class="session-card">
+          <div class="session-date">${MONTHS_PT[new Date(s.date+'T12:00:00').getMonth()]}<strong>${new Date(s.date+'T12:00:00').getDate()}</strong></div>
+          <div class="session-info">
+            <h4 style="font-style:italic;font-weight:400;font-size:13px;color:var(--dim)">"${s.note}"</h4>
+            <div class="session-meta"><span class="session-tag">${s.deck||'Anki'}</span></div>
+          </div>
+        </div>`).join('')
+    : '<div class="empty"><div class="empty-icon">📓</div>Nenhuma dificuldade registrada ainda.</div>';
+}
+
+function setRing(id,pct,valId,valText,color){
+  const circle=document.getElementById(id+'-circle');
+  const valEl=document.getElementById(valId);
+  if(circle){
+    const circumference=163;
+    const offset=circumference-(pct/100*circumference);
+    circle.style.strokeDashoffset=offset;
+    circle.style.stroke=color;
+  }
+  if(valEl) valEl.textContent=valText;
+}
+
+/* ─── GOALS ─────────────────────────────── */
+function renderGoals(){
+  const milestones=[
+    {days:3,label:'Iniciante',icon:'🌱'},
+    {days:7,label:'Uma semana',icon:'⚡'},
+    {days:14,label:'Duas semanas',icon:'💪'},
+    {days:21,label:'Hábito formado',icon:'🧠'},
+    {days:30,label:'Um mês',icon:'🏅'},
+    {days:60,label:'Dois meses',icon:'🥈'},
+    {days:100,label:'Centenário',icon:'🥇'},
+    {days:180,label:'Seis meses',icon:'💎'},
+    {days:365,label:'Um ano',icon:'👑'},
+  ];
+
+  const streak=state.streak;
+  document.getElementById('milestones-list').innerHTML = milestones.map(m=>{
+    const done=streak>=m.days;
+    const pct=done?100:Math.min(100,Math.round(streak/m.days*100));
+    const color=done?'var(--mint)':'var(--fire)';
+    return `<div class="goal-card" style="${done?'border-color:rgba(0,229,160,.3)':''}">
+      <div class="goal-header">
+        <div class="goal-title">${m.icon} ${m.label} ${done?'✅':''}</div>
+        <div class="goal-pct" style="color:${color}">${done?'✓':streak+'/'+m.days}</div>
+      </div>
+      <div class="goal-bar-track">
+        <div class="goal-bar-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <div class="goal-meta">${m.days} dias consecutivos ${done?'— Conquistado! 🎉':`— faltam ${m.days-streak} dias`}</div>
+    </div>`;
+  }).join('');
+
+  // daily goals
+  const today=todayISO();
+  const todaySess=state.sessions.filter(s=>s.date===today);
+  const todayCards=todaySess.reduce((a,b)=>a+(b.cards||0),0);
+  const todayTime=todaySess.reduce((a,b)=>a+(b.time||0),0);
+  const g=state.settings;
+
+  const dailyGoals=[
+    {label:'Cards respondidos',cur:todayCards,target:g.goalCards||50,icon:'📚',color:'var(--fire)'},
+    {label:'Tempo de estudo',cur:todayTime,target:g.goalTime||30,icon:'⏱️',color:'var(--mint)',unit:'min'},
+  ];
+
+  document.getElementById('daily-goals-list').innerHTML = dailyGoals.map(dg=>{
+    const pct=Math.min(100,Math.round(dg.cur/dg.target*100));
+    const done=pct>=100;
+    return `<div class="goal-card" style="${done?'border-color:rgba(0,229,160,.3)':''}">
+      <div class="goal-header">
+        <div class="goal-title">${dg.icon} ${dg.label} ${done?'✅':''}</div>
+        <div class="goal-pct" style="color:${dg.color}">${pct}%</div>
+      </div>
+      <div class="goal-bar-track">
+        <div class="goal-bar-fill" style="width:${pct}%;background:${dg.color}"></div>
+      </div>
+      <div class="goal-meta">${dg.cur}${dg.unit||''} de ${dg.target}${dg.unit||''} ${done?'— Meta batida! 🎉':'— meta do dia'}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ─── HISTORY ─────────────────────────────── */
+function renderHistory(){
+  const all=[...state.sessions].reverse();
+  const el=document.getElementById('full-history-list');
+  if(!all.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">📋</div>Nenhuma sessão registrada.</div>';
+    return;
+  }
+  el.innerHTML=all.map(sessionCard).join('');
+}
+
+/* ══════════════════════════════════════
+   MOTIVATIONAL
+══════════════════════════════════════ */
+function motivationalMsg(streak){
+  if(streak===0) return 'Registre sua primeira sessão e comece sua jornada! 🌱';
+  if(streak===1) return 'Primeiro dia — o início de algo grande! Volte amanhã. 💪';
+  if(streak<7)   return `${streak} dias seguidos! Você está construindo um hábito de ferro. 🔥`;
+  if(streak<14)  return `${streak} dias! Uma semana completa — você é consistente! ⚡`;
+  if(streak<30)  return `${streak} dias! Imparável. A ciência diz que ${21-streak>0?`faltam ${21-streak} dias para solidificar o hábito`:'o hábito já é seu'}! 🧠`;
+  if(streak<100) return `${streak} dias de dedicação pura. Você está no top 1% de estudantes. 🏆`;
+  return `${streak} dias. Lendário. Você redefiniu o que é possível. 👑`;
+}
+
+/* ══════════════════════════════════════
+   SETTINGS
+══════════════════════════════════════ */
+function openSettings(){
+  const g=state.settings;
+  document.getElementById('set-goal-cards').value=g.goalCards||50;
+  document.getElementById('set-goal-time').value=g.goalTime||30;
+  document.getElementById('set-freeze').value=g.freezeDays||0;
+  document.getElementById('set-name').value=g.name||'';
+  document.getElementById('settings-modal').classList.add('open');
+}
+function closeSettings(){ document.getElementById('settings-modal').classList.remove('open'); }
+function closeModal(e){ if(e.target===document.getElementById('settings-modal')) closeSettings(); }
+function saveSettings(){
+  state.settings.goalCards=parseInt(document.getElementById('set-goal-cards').value)||50;
+  state.settings.goalTime=parseInt(document.getElementById('set-goal-time').value)||30;
+  state.settings.freezeDays=parseInt(document.getElementById('set-freeze').value)||0;
+  state.settings.name=document.getElementById('set-name').value.trim();
+  saveState();
+  closeSettings();
+  renderAll();
+  showToast('✅ Configurações salvas!');
+}
+function resetData(){
+  if(!confirm('Apagar TODOS os dados? Isso não pode ser desfeito.')) return;
+  localStorage.removeItem(STORE_KEY);
+  state=defaultState();
+  closeSettings();
+  renderAll();
+  showToast('🗑️ Dados apagados');
+}
+
+/* ══════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════ */
+function navigate(screen, btn){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('screen-'+screen).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ══════════════════════════════════════
+   TOAST
+══════════════════════════════════════ */
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+/* ══════════════════════════════════════
+   INIT
+══════════════════════════════════════ */
+if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
+
+document.addEventListener('DOMContentLoaded',()=>{
+  computeStreak();
+  renderAll();
+
+  // ring animation on load
+  setTimeout(()=>{
+    document.querySelectorAll('.ring-wrap circle:last-child').forEach(c=>{
+      c.style.transition='stroke-dashoffset 1s cubic-bezier(.23,1,.32,1)';
+    });
+  },300);
+});
+</script>
+</body>
+</html>
